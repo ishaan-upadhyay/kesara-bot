@@ -1,0 +1,5 @@
+# Virtual environment and VS Code specific files
+.venv/
+.vscode/
+# Environment variables
+.env
