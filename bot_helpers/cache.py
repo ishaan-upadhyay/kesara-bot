@@ -98,7 +98,7 @@ class LRUCache:
             self.remove_head()
         
         # Add the new node, key to the hashmap
-        new_node = Node(val=value, key=key)
+        new_node = Node(key, value)
         self.search[key] = new_node
         self.append_new_node(new_node)
 
@@ -107,6 +107,6 @@ class BotCache:
     def __init__(self):
         self.prefixes = LRUCache(512)
 
-    def set_prefix_cache():
+    def set_prefix_cache(self):
         pass
     
