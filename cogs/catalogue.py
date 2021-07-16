@@ -1,5 +1,4 @@
 import asyncio
-import asyncpg
 import aiohttp
 import os
 import tekore as tk

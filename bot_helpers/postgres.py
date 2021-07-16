@@ -33,3 +33,9 @@ class Postgres:
             async with con.transaction():
                 con.executemany(statement, params)
             return()
+
+    async def iterate(self, statement, *params):
+        async with self.pool.acquire() as con:
+            async with con.transaction():
+                async with con.cursor() as curs:
+                    pass

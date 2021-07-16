@@ -1,5 +1,5 @@
 import os
-import pylast
+import aiohttp
 
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -7,25 +7,23 @@ from dotenv import load_dotenv
 load_dotenv(verbose=True)
 
 LASTFM_KEY=os.getenv('LAST_KEY')
-LASTFM_SECRET = os.getenv('LASTFM_SECRET')
 class LastFM(commands.Cog, name="lastfm"):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.network = pylast.LastFMNetwork(LASTFM_KEY, LASTFM_SECRET)
+
+    def is_target_self(self, ctx):
+        return not bool(ctx.message.mentions)
     
     @commands.group('fm')
     async def fm(self, ctx):
-        ctx.other_target = bool(ctx.message.mentions)
         await get_username(ctx)
-
+        
         if ctx.invoked_subcommand() is None:
             pass
 
     @fm.command('set')
+    @commands.check(is_target_self)
     async def set(self, ctx, name: str):
-        if ctx.other_target:
-            #Should warn user that they are trying to set user for someone else
-            pass
         
         await self.bot.db.execute(
             """
@@ -39,9 +37,8 @@ class LastFM(commands.Cog, name="lastfm"):
         )
     
     @fm.command('unset')
+    @commands.check(is_target_self)
     async def unset(self, ctx):
-        if ctx.other_target:
-            pass
 
         await self.bot.db.execute(
             """
@@ -61,8 +58,16 @@ class LastFM(commands.Cog, name="lastfm"):
     # @fm.command()
     # async def 
 
+async def request_lastfm(self, params):
+    params |= {'api_key': LASTFM_KEY, 'format': 'json'}
+    async with aiohttp.ClientSession() as session:
+        async with session.get('http://ws.audioscrobbler.com/2.0/', params) as resp:
+            info = resp.json()
+            if resp.status == 200:
+                return info
+
 async def get_username(ctx):
-    if ctx.other_target:
+    if bool(ctx.message.mentions):
         ctx.target = ctx.message.raw_mentions[0]
     else:
         ctx.target = ctx.message.author.id

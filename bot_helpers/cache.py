@@ -1,6 +1,8 @@
 # Least-recently used cache implementation as written by Jerry An 
 # https://levelup.gitconnected.com/design-an-least-recently-used-cache-in-python-2f2d4a3fee6d
-
+from types import FunctionType
+from discord.ext import commands
+from typing import Callable
 class Node:
     def __init__(self, key, value) -> None:
         self.key = key
@@ -12,14 +14,16 @@ class LRUCache:
     """Implementation of a least recently used cache in Python using a doubly-linked list alongside a hashmap
 
     :param capacity: Size of the cache
+    :param update_func: Function which updates the cache if a value is not found
     """
     
-    def __init__(self, capacity: int):
+    def __init__(self, capacity: int, update_func: Callable[...]=None):
         self.capacity = capacity
         self.search = {}
         self.dummy = Node(0,0)
         self.head = self.dummy.next
         self.tail = self.dummy.next
+        self.update_func = update_func
              
     def remove_head(self):
         """Remove the head node (least recently used)
@@ -60,8 +64,6 @@ class LRUCache:
         prev_node.next = next_node    
         next_node.prev = prev_node
         
-
-        
     def get(self, key):
         """Fetches value for a specific key from the linked list
 
@@ -69,7 +71,7 @@ class LRUCache:
         :return: Node value
         """
         if key not in self.search:
-            return -1
+            return -1 if self.update_func is None else self.update_func()
         
         node = self.search[key] 
         
@@ -104,9 +106,18 @@ class LRUCache:
 
 class BotCache:
     
-    def __init__(self):
-        self.prefixes = LRUCache(512)
+    def __init__(self, bot):
+        self.prefixes = LRUCache(2048, self.get_prefix_db)
+        self.bot = bot
 
-    def set_prefix_cache(self):
-        pass
-    
+    async def get_prefix_db(self, key):
+        prefix = await self.bot.db.execute(
+            """
+            SELECT prefix FROM guilds WHERE guild_id=$s
+            """,
+            key,
+            is_query=True,
+            one_val=True
+        )
+        self.prefixes.put(key, prefix)
+        return prefix
