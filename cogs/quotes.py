@@ -19,7 +19,7 @@ class Quotes(commands.Cog, name='quotes'):
 
     @quotes.command()
     @has_permissions(manage_messages=True)
-    async def adduser(self, ctx: commands.Context, member: Member):
+    async def adduser(self, ctx: commands.Context, member:Member=None):
 
         target = member if member is not None else ctx.author
 
@@ -37,16 +37,16 @@ class Quotes(commands.Cog, name='quotes'):
                         description=f"{esc_md(target.display_name)} added to quotes - \n Start adding quotes using {ctx.prefix}quotes add",
                         colour=target.colour
                        ).set_footer(
-                        text=f"Added by {esc_md(ctx.author.display_name)}",
+                        text=f"Added by {ctx.author.display_name}",
                         icon_url=ctx.author.avatar_url
                        ).set_thumbnail(
                            url=target.avatar_url
                        )
         
-        ctx.send(embed=to_send)
+        await ctx.send(embed=to_send)
 
     @quotes.command()
-    async def removeuser(self, ctx: commands.Context, member: Member):
+    async def removeuser(self, ctx: commands.Context, member:Member=None):
     
         def check(reaction, user) -> bool:
             return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirm_msg.id
@@ -64,7 +64,7 @@ class Quotes(commands.Cog, name='quotes'):
                 """DELETE FROM quotes
                 WHERE guild_id = $1
                 AND user_id = $2
-                RETURNING cardinality(quotes_array)
+                RETURNING cardinality(quotes)
                 """,
                 ctx.guild.id,
                 target.id,
@@ -76,7 +76,7 @@ class Quotes(commands.Cog, name='quotes'):
                             description=f"{esc_md(target.display_name)} removed from quotes - \n had {count} quotes on this server",
                             colour=ctx.author.colour
                         ).set_footer(
-                            text=f"Removed by {esc_md(ctx.author.display_name)}",
+                            text=f"Removed by {ctx.author.display_name}",
                             icon_url=ctx.author.avatar_url
                         ).set_thumbnail(
                             url=member.avatar_url
@@ -85,17 +85,17 @@ class Quotes(commands.Cog, name='quotes'):
             await ctx.send(embed=to_send)
 
     @quotes.command()
-    async def add(self, ctx, quote: str, member: Member):
+    async def add(self, ctx, quote: str, member:Member=None):
 
         target = member if member is not None else ctx.author
         
         await self.bot.db.execute(
         """UPDATE quotes
-           SET quotes_array = quotes_array || $1
+           SET quotes = quotes || $1
            WHERE guild_id = $2
            AND user_id = $3
         """,
-        quote,
+        [quote],
         ctx.guild.id,
         target.id
         )
@@ -104,25 +104,25 @@ class Quotes(commands.Cog, name='quotes'):
                         description=quote,
                         colour=target.colour
                        ).set_author(
-                        name=esc_md(target.display_name), 
+                        name=target.display_name, 
                         url=target.avatar_url
                        ).set_footer(
-                        text=f"Added by {esc_md(ctx.author.display_name)}",
+                        text=f"Added by {ctx.author.display_name}",
                         icon_url=ctx.author.avatar_url
                        )
 
         await ctx.send(embed=to_send)
 
     @quotes.command()
-    async def remove(self, ctx: commands.Context, index: int, member: Member):
+    async def remove(self, ctx: commands.Context, index: int, member: Member=None):
         target = member if member is not None else ctx.author
         
         removed = await self.bot.db.execute(
         """UPDATE quotes
-           SET quotes_array = array_remove(quotes_array, quotes_array[$1])
+           SET quotes = array_remove(quotes, quotes[$1])
            WHERE guild_id = $2
            and user_id = $3
-           RETURNING quotes_array[$1]
+           RETURNING quotes[$1]
         """,
         index,
         ctx.guild.id,
@@ -138,18 +138,18 @@ class Quotes(commands.Cog, name='quotes'):
                         name=esc_md(target.display_name), 
                         url=target.avatar_url
                        ).set_footer(
-                        text=f"Removed by {esc_md(ctx.author.display_name)}",
+                        text=f"Removed by {ctx.author.display_name}",
                         icon_url=ctx.author.avatar_url
                        )
         
         await ctx.send(embed=to_send)
 
     @quotes.command()
-    async def random(self, ctx: commands.Context, member: Member):
+    async def random(self, ctx: commands.Context, member: Member=None):
         target = member if member is not None else ctx.author
         
         quotes = await self.bot.db.execute(
-            """SELECT quotes_array FROM quotes WHERE guild_id=$1 AND user_id=$2""",
+            """SELECT quotes FROM quotes WHERE guild_id=$1 AND user_id=$2""",
             ctx.guild.id,
             target.id,
             is_query=True,
@@ -164,19 +164,19 @@ class Quotes(commands.Cog, name='quotes'):
                         ).set_thumbnail(
                             url=target.avatar_url
                         ).set_footer(
-                            text=f"Requested by {esc_md(ctx.author.display_name)}",
+                            text=f"Requested by {ctx.author.display_name}",
                             icon_url=ctx.author.avatar_url
                         )
 
-        ctx.send(embed=to_send)
+        await ctx.send(embed=to_send)
 
 
     @quotes.command()
-    async def view(self, ctx, index: int, member: Member):
+    async def view(self, ctx, index: int, member: Member=None):
         target = member if member is not None else ctx.author
         
         quote = await self.bot.db.execute(
-            """SELECT quotes_array[$1] FROM quotes WHERE guild_id=$2 AND user_id=$3""",
+            """SELECT quotes[$1] FROM quotes WHERE guild_id=$2 AND user_id=$3""",
             index,
             ctx.guild.id,
             target.id,
@@ -190,57 +190,65 @@ class Quotes(commands.Cog, name='quotes'):
                         ).set_thumbnail(
                             url=target.avatar_url
                         ).set_footer(
-                            text=f"Requested by {esc_md(ctx.author.display_name)}",
+                            text=f"Requested by {ctx.author.display_name}",
                             icon_url=ctx.author.avatar_url
                         )
         
-        ctx.send(embed=to_send)
+        await ctx.send(embed=to_send)
 
     @quotes.command()
-    async def userlist(self, ctx, member: Member):
+    async def userlist(self, ctx, member: Member=None):
         target = member if member is not None else ctx.author
         
         quotes = await self.bot.db.execute(
-            """SELECT quotes_arr FROM quotes WHERE guild_id=$1 AND user_id=$2""",
+            """SELECT quotes FROM quotes WHERE guild_id=$1 AND user_id=$2""",
             ctx.guild.id,
             target.id,
             is_query=True,
-            one_col=True
+            one_val=True
         )
 
         for idx, quote in enumerate(quotes):
             quotes[idx] = f'"*{quote}*"' if len(quote) < 196 else f'"*{quote[:193]}...*"'
 
         to_send = Embed(title=f'Quotes from {esc_md(target.display_name)}',
+                        description='',
                         colour=target.colour
                        ).set_thumbnail(
                            url=target.avatar_url
                        ).set_footer(
-                           text=f'Requested by {esc_md(ctx.author.display_name)}',
+                           text=f'Requested by {ctx.author.display_name}',
                            icon_url=ctx.author.avatar_url
                        )
         
-        pagination.send_pages(ctx, to_send, quotes)
+        await pagination.send_pages(ctx, to_send, quotes)
         
-   
     @quotes.command()
-    async def serverlist(self, ctx):
+    async def serverlist(self, ctx: commands.Context):
         users = await self.bot.db.execute(
             """SELECT user_id FROM quotes where guild_id=$1""",
             ctx.guild.id,
             is_query=True,
             one_col=True)
         
-        usernames = [esc_md(self.bot.get_user(user).display_name) for user in users]
+        members = [None] * len(users)
+        
+        for idx, user in enumerate(users):
+            members[idx] = await ctx.guild.fetch_member(user)
+
+        usernames = [esc_md(member.display_name) for member in members]
 
         to_send = Embed(title=f'Users with quotes from {esc_md(ctx.guild.name)}',
+                        description="",
                         colour=ctx.author.colour
                        ).set_thumbnail(
-                           url=ctx.guild.avatar_url
+                           url=ctx.guild.icon_url
                        ).set_footer(
-                           text=f'Requested by {esc_md(ctx.author.display_name)}',
+                           text=f'Requested by {ctx.author.display_name}',
                            icon_url=ctx.author.avatar_url
                        )
 
-        pagination.send_pages(ctx, to_send, usernames)
+        await pagination.send_pages(ctx, to_send, usernames)
 
+def setup(bot):
+    bot.add_cog(Quotes(bot))

@@ -16,12 +16,15 @@ def pages_from_list(base_embed: Embed, contents: list, max_lines=20):
     pages=[]
 
     for idx, content in enumerate(contents, start=1):
-        if len(base_embed.description) + len(content) <= 2000 and (idx-1) % max_lines != 0:
+        if len(base_embed.description) + len(content) <= 2000 and idx % max_lines != 0:
             base_embed.description += f'\n{content}'
         else:
             pages.append(base_embed)
             base_embed = deepcopy(base_embed)
             base_embed.description = content
+    
+    if base_embed is not None and base_embed.description != '':
+        pages.append(base_embed)
     
     return pages
 

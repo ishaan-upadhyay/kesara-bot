@@ -17,7 +17,7 @@ class LRUCache:
     :param update_func: Function which updates the cache if a value is not found
     """
     
-    def __init__(self, capacity: int, update_func: Callable[...]=None):
+    def __init__(self, capacity: int, update_func: Callable[[], None]):
         self.capacity = capacity
         self.search = {}
         self.dummy = Node(0,0)
@@ -64,14 +64,17 @@ class LRUCache:
         prev_node.next = next_node    
         next_node.prev = prev_node
         
-    def get(self, key):
+    def get(self, key, fallback):
         """Fetches value for a specific key from the linked list
 
         :param key: Node identifier of any type
+        :param fallback: Returned if key is not found
         :return: Node value
         """
-        if key not in self.search:
+        if key not in self.search and fallback is None:
             return -1 if self.update_func is None else self.update_func()
+        elif key not in self.search:
+            return fallback
         
         node = self.search[key] 
         

@@ -5,27 +5,29 @@ from dotenv import load_dotenv
 load_dotenv(verbose=True)
 DB_CONN=os.getenv('DB_CONN')
 class Postgres:
-    def __init__(self) -> None:
+    def __init__(self, bot) -> None:
         self.pool = None
+        bot.loop.create_task(self.init_pool())
 
     async def init_pool(self) -> None:
         self.pool = await asyncpg.create_pool(dsn=DB_CONN)
+        print("Pool initialized")
 
     async def execute(self, statement, *params, is_query=False, one_val=False, one_row=False, one_col=False):
         async with self.pool.acquire() as con:
             async with con.transaction():
                     if is_query:
                         if one_val:
-                            data = await con.fetchval(statement, params)
+                            data = await con.fetchval(statement, *params)
                         elif one_row:
-                            data = await con.fetchrow(statement, params)
+                            data = await con.fetchrow(statement, *params)
                         elif one_col:
-                            data = await [result[0] async for result in con.cursor(statement, params)]
+                            data = [result[0] async for result in con.cursor(statement, *params)]
                         else:
                             return ()
                         return data if data is not None else ()
                     else:
-                        con.execute(statement, params)
+                        await con.execute(statement, *params)
                         return ()
     
     async def executemany(self, statement, *params):

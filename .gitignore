@@ -3,5 +3,5 @@
 .vscode/
 # Environment variables
 .env
-# Documentation
-pylast.html
+# Pycache files
+*.pyc
