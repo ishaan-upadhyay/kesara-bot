@@ -28,7 +28,7 @@ class LastFM(commands.Cog, name="lastfm"):
         await self.bot.db.execute(
             """
             INSERT INTO users (user_id, last_fm)
-                VALUES ($s $s)
+                VALUES ($1 $2)
             ON CONFLICT (user_id) DO UPDATE
                 SET last_fm = excluded.last_fm;
             """,
@@ -58,13 +58,33 @@ class LastFM(commands.Cog, name="lastfm"):
     # @fm.command()
     # async def 
 
-async def request_lastfm(self, params):
-    params |= {'api_key': LASTFM_KEY, 'format': 'json'}
-    async with aiohttp.ClientSession() as session:
-        async with session.get('http://ws.audioscrobbler.com/2.0/', params) as resp:
-            info = resp.json()
-            if resp.status == 200:
-                return info
+    async def get_playcount(self, artist, name, music_type, username=None):
+        params = {
+            'method' : f'{music_type}.getInfo',
+            'artist' : artist
+        }
+
+        if name is not None:
+            params[f'{music_type}'] = name
+        if username is not None:
+            params['username'] = username
+
+        info = self.request_lastfm(params)
+
+
+    async def request_lastfm(self, params):
+        params |= {'api_key': LASTFM_KEY, 'format': 'json'}
+        async with aiohttp.ClientSession() as session:
+            async with session.get('http://ws.audioscrobbler.com/2.0/', params) as resp:
+                info = resp.json()
+                
+                if info is not None:
+                    if resp.status == 200 and 'error' not in info.keys:
+                        return info
+                    elif 'error' in info.keys:
+                        pass
+                else:
+                    pass
 
 async def get_username(ctx):
     if bool(ctx.message.mentions):

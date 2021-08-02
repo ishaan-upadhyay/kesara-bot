@@ -1,7 +1,9 @@
 # Virtual environment and VS Code specific files
 .venv/
 .vscode/
+workspace.code-workspace
 # Environment variables
 .env
 # Pycache files
 *.pyc
+
