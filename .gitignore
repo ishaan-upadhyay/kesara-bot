@@ -1,5 +1,6 @@
 # Virtual environment and VS Code specific files
 .venv/
+.venv-ubuntu/
 .vscode/
 workspace.code-workspace
 # Environment variables
