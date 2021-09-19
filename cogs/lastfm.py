@@ -36,7 +36,7 @@ class LastFM(commands.Cog, name="lastfm"):
             ON CONFLICT (user_id) DO UPDATE
                 SET last_fm = excluded.last_fm;
             """,
-            str(ctx.target),
+            str(ctx.target.id),
             name,
         )
 
@@ -53,7 +53,7 @@ class LastFM(commands.Cog, name="lastfm"):
             ON CONFLICT (user_id) DO UPDATE
                 SET last_fm = excluded.last_fm;
             """,
-            ctx.target,
+            ctx.target.id,
             None,
         )
 
@@ -119,7 +119,7 @@ class LastFM(commands.Cog, name="lastfm"):
                 if info is not None:
                     if resp.status == 200 and "error" not in info.keys():
                         return info
-                    elif "error" in info.keys:
+                    elif "error" in info.keys():
                         pass
                 else:
                     pass
