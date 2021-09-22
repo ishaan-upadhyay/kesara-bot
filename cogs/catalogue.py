@@ -22,7 +22,6 @@ class Catalogue(commands.Cog, name="catalogue"):
             else:
                 check_id = ctx.author.id
             return ctx.bot.cache.catalogue_users.get(check_id, None)
-
         return commands.check(predicate)
 
     @commands.group(case_insensitive=True)

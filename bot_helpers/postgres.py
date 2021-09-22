@@ -1,4 +1,5 @@
 import asyncpg
+import psycopg2
 import os
 from dotenv import load_dotenv
 
@@ -9,6 +10,7 @@ DB_CONN = os.getenv("DB_CONN")
 class Postgres:
     def __init__(self, bot) -> None:
         self.pool = None
+        self.sync_conn = psycopg2.connect(DB_CONN)
 
     async def init_pool(self) -> None:
         self.pool = await asyncpg.create_pool(dsn=DB_CONN)
@@ -55,3 +57,15 @@ class Postgres:
             async with con.transaction():
                 async with con.cursor() as curs:
                     pass
+
+    def sync_execute(self, statement: str, params: tuple, is_query=False, one_row=False, one_col=False):
+        with self.sync_conn.cursor() as curs:
+            curs.execute(statement, params)
+            if is_query:
+                if one_row:
+                    data = curs.fetchone()
+                elif one_col:
+                    data = [result[0] for result in curs.fetchall()]
+                else:
+                    data = curs.fetchall()
+                return data
