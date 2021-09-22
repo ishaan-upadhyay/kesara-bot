@@ -112,26 +112,26 @@ class BotCache:
         self.catalogue_users = LRUCache(2048, self.get_catalogue_enabled)
         self.bot = bot
 
-    def get_prefix_db(self, key) -> str:
-        prefix = self.bot.db.sync_execute(
+    async def get_prefix_db(self, key) -> str:
+        prefix = await self.bot.db.execute(
             """
-            SELECT prefix FROM guilds WHERE guild_id=(%s)
+            SELECT prefix FROM guilds WHERE guild_id=$1
             """,
-            (str(key)),
+            str(key),
             is_query=True,
-            one_row=True,
+            one_val=True,
         )
         self.prefixes.put(key, prefix)
         return prefix
 
-    def get_catalogue_enabled(self, key) -> bool:
-        is_enabled = self.bot.db.sync_execute(
+    async def get_catalogue_enabled(self, key) -> bool:
+        is_enabled = await self.bot.db.execute(
             """
-            SELECT catalogue_enabled FROM users WHERE user_id=(%s)
+            SELECT catalogue_enabled FROM users WHERE user_id=$1
             """,
-            (str(key)),
+            str(key),
             is_query=True,
-            one_row=True,
+            one_val=True,
         )
         self.catalogue_users.put(key, is_enabled)
         return is_enabled
