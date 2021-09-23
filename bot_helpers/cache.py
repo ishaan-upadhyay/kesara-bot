@@ -117,7 +117,7 @@ class BotCache:
             """
             SELECT prefix FROM guilds WHERE guild_id=$1
             """,
-            (str(key)),
+            [str(key)],
             is_query=True,
             one_val=True,
         )
@@ -129,7 +129,7 @@ class BotCache:
             """
             SELECT catalogue_enabled FROM users WHERE user_id=$1
             """,
-            (str(key)),
+            [str(key)],
             is_query=True,
             one_val=True,
         )
