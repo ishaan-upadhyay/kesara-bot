@@ -16,7 +16,6 @@ class Catalogue(commands.Cog, name="catalogue"):
 
     def is_enabled():
         async def predicate(ctx):
-            print(ctx.message.raw_mentions)
             if ctx.message.raw_mentions != []:
                 check_id = ctx.message.raw_mentions[0]
             else:
@@ -88,8 +87,6 @@ class Catalogue(commands.Cog, name="catalogue"):
             approval_status,
             is_query=True,
         )
-
-        print(music_info)
 
         members = {
             record[4]: await ctx.guild.fetch_member(int(record[4]))
@@ -334,8 +331,6 @@ class Catalogue(commands.Cog, name="catalogue"):
             ctx, index, ctx.invoked_with == "remove"
         )
 
-        print(entry_id)
-
         removed = await self.bot.db.execute(
             """
             DELETE FROM catalogue
@@ -380,7 +375,6 @@ class Catalogue(commands.Cog, name="catalogue"):
         await ctx.send(embed=to_send)
 
     async def get_music_info(self, music_type: str, id: str):
-        print(music_type + "\n" + id)
         if music_type == "track":
             track = await self.bot.spotify.track(id)
             artists = [artist.name for artist in track.artists]
@@ -405,8 +399,6 @@ class Catalogue(commands.Cog, name="catalogue"):
     async def get_music_plays(self, ctx, music_type, music_id, artists, name):
         lastfm = self.bot.get_cog("lastfm")
         await lastfm.get_username(ctx)
-
-        print(ctx.lastfm_user)
 
         if music_type == "track":
             count = await lastfm.get_playcount(
