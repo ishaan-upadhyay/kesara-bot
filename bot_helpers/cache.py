@@ -115,7 +115,7 @@ class BotCache:
     def get_prefix_db(self, key) -> str:
         prefix = self.bot.db.sync_execute(
             """
-            SELECT prefix FROM guilds WHERE guild_id=$1
+            SELECT prefix FROM guilds WHERE guild_id=(%s)
             """,
             [str(key)],
             is_query=True,
@@ -127,7 +127,7 @@ class BotCache:
     def get_catalogue_enabled(self, key) -> bool:
         is_enabled = self.bot.db.sync_execute(
             """
-            SELECT catalogue_enabled FROM users WHERE user_id=$1
+            SELECT catalogue_enabled FROM users WHERE user_id=(%s)
             """,
             [str(key)],
             is_query=True,
