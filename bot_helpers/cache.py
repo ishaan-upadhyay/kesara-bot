@@ -119,7 +119,7 @@ class BotCache:
             """,
             [str(key)],
             is_query=True,
-            one_val=True,
+            one_row=True,
         )
         self.prefixes.put(key, prefix)
         return prefix
@@ -131,7 +131,7 @@ class BotCache:
             """,
             [str(key)],
             is_query=True,
-            one_val=True,
+            one_row=True,
         )
         self.catalogue_users.put(key, is_enabled)
         return is_enabled
