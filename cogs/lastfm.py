@@ -114,7 +114,6 @@ class LastFM(commands.Cog, name="lastfm"):
             ) as resp:
 
                 info = await resp.json()
-                print(info)
 
                 if info is not None:
                     if resp.status == 200 and "error" not in info.keys():
@@ -129,8 +128,6 @@ class LastFM(commands.Cog, name="lastfm"):
             ctx.target = ctx.message.mentions[0]
         else:
             ctx.target = ctx.author
-
-        print(ctx.target)
 
         ctx.lastfm_user = await ctx.bot.db.execute(
             """SELECT last_fm FROM users WHERE user_id=$1""",
