@@ -1,7 +1,6 @@
 import os
 import aiohttp
 from discord import Embed
-
 from discord.ext import commands
 from discord.utils import escape_markdown as esc_md
 from dotenv import load_dotenv
@@ -18,7 +17,7 @@ class LastFM(commands.Cog, name="lastfm"):
     def is_target_self(ctx):
         return not bool(ctx.message.mentions)
 
-    @commands.group("fm")
+    @bot.hybrid_group(fallback="set")
     async def fm(self, ctx):
         await self.get_username(ctx)
 
@@ -135,7 +134,6 @@ class LastFM(commands.Cog, name="lastfm"):
             is_query=True,
             one_val=True,
         )
-
 
 def setup(bot):
     bot.add_cog(LastFM(bot))

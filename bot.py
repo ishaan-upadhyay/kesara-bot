@@ -1,14 +1,10 @@
 import os
+from dotenv import load_dotenv
 import discord
 import asyncio
 from discord.ext import commands
-import random
-import sys
 import traceback
 import tekore as tk
-from dotenv import load_dotenv
-from tekore._client.api import track
-from bot_helpers.utils import get_prefix  # pylint=disable-import-error
 from bot_helpers.cache import BotCache
 from bot_helpers.postgres import Postgres
 
@@ -16,9 +12,9 @@ from bot_helpers.postgres import Postgres
 load_dotenv(verbose=True)
 
 TOKEN = os.getenv("TOKEN")
-COMMAND_PREFIX = os.getenv("PREFIX")
 SPOTIFY_TOKEN = os.getenv("SPOT_TOKEN")
 SPOTIFY_SECRET = os.getenv("SPOT_SECRET")
+DEBUG_GUILD = os.getenv("DEBUG_GUILD")
 
 class KesaraBot(commands.Bot):
     def __init__(self, **kwargs):
@@ -34,21 +30,19 @@ class KesaraBot(commands.Bot):
         await self.spotify.close()
         await super().close()
 
-bot = KesaraBot(command_prefix=get_prefix, owner_id=291666852533501952)
+bot = KesaraBot(owner_id=291666852533501952, debug_guilds=[DEBUG_GUILD])
 
 @bot.event
 async def on_ready():
     print("Successfully logged in as {0}!".format(bot.user.name))
     print("========================================")
 
-
 @bot.event
-async def on_message(message):
-    if message.author == bot.user or message.author.bot:
+async def on_application_command(ctx):
+    if ctx.interaction.user == bot.user or ctx.interaction.user.bot:
         return
 
-    await bot.process_commands(message)
-
+    await bot.process_application_commands(ctx)
 
 extensions = [
     "quotes",

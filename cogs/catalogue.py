@@ -3,13 +3,14 @@ import aiohttp
 from bot_helpers import pagination
 from urllib.parse import urlparse, urlunparse
 from discord.utils import escape_markdown as esc_md
-from discord import Member, Embed
+from discord import app_commands
 from discord.ext import commands
 
 
 class Catalogue(commands.Cog, name="catalogue"):
     def __init__(self, bot) -> None:
         self.bot = bot
+        super().__init__()
 
     async def is_target_self(ctx):
         return not bool(ctx.message.mentions)
@@ -23,14 +24,8 @@ class Catalogue(commands.Cog, name="catalogue"):
             return ctx.bot.cache.catalogue_users.get(check_id, None)
         return commands.check(predicate)
 
-    @commands.group(case_insensitive=True)
-    async def catalogue(self, ctx):
-        pass
-
-    @catalogue.command(description="Enable catalogue functionality for yourself.")
-    @commands.check(is_target_self)
-    async def enable(self, ctx):
-
+    @app_commands.command(name = "enable", description="Enable catalogue functionality for yourself.")
+    async def enable(self, interaction: discord.Interaction):
         await self.bot.db.execute(
             """
             INSERT INTO users (user_id, catalogue_enabled)
@@ -38,16 +33,13 @@ class Catalogue(commands.Cog, name="catalogue"):
             ON CONFLICT (user_id) DO UPDATE
                 SET catalogue_enabled = excluded.catalogue_enabled
             """,
-            str(ctx.author.id),
+            str(interaction.user.id),
             True,
         )
+        await interaction.response.send("Catalogue successfully enabled.")
 
-        await ctx.send("Catalogue successfully enabled.")
-
-    @catalogue.command(description="Disable catalogue functionality for yourself.")
-    @commands.check(is_target_self)
-    async def disable(self, ctx):
-
+    @app_commands.command(name = "disable", description="Disable catalogue functionality for yourself.")
+    async def disable(self, interaction: discord.Interaction):
         await self.bot.db.execute(
             """
             INSERT INTO users (user_id, catalogue_enabled)
@@ -55,7 +47,7 @@ class Catalogue(commands.Cog, name="catalogue"):
             ON CONFLICT (user_id) DO UPDATE
                 SET catalogue_enabled = is_catalogue_enabled
             """,
-            str(ctx.author.id),
+            str(interaction.user.id),
             False,
         )
 
