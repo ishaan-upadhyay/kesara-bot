@@ -15,4 +15,5 @@ The default prefix for Kesara is ';' but you can easily alter it for your own se
 ## Credits
 - [joinemn's Miso Bot](https://github.com/joinemm/miso-bot) was a valuable reference for getting Kesara to work with the Last.fm API, primarily for retrieving playcounts, code was modified to work with PostgreSQL as well as slash commands rather than conventional ones
 - [esmBot's wiki entry for PostgreSQL setup](https://esmbot.github.io/esmBot/postgresql/) was especially useful to understand how to initialize PostgreSQL databases
+
 And finally, a big thank you to everyone involved in writing the libraries used for Kesara!
