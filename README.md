@@ -1,3 +1,4 @@
+![image](https://user-images.githubusercontent.com/33141569/188013757-d2adf9a4-034c-437c-b088-a36d2de8c78a.png)
 # Kesara
 Kesara is a multipurpose Discord bot primarily featuring Last.fm, quotes and music cataloguing functionality for personal usage, written in Python. It is designed to be self-hosted on a device such as a Raspberry Pi. 
 
