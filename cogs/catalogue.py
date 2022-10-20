@@ -3,8 +3,9 @@ import aiohttp
 from bot_helpers import pagination
 from urllib.parse import urlparse, urlunparse
 from discord.utils import escape_markdown as esc_md
-from discord import app_commands
+import discord
 from discord.ext import commands
+from typing import Literal
 
 
 class Catalogue(commands.Cog, name="catalogue"):
@@ -50,39 +51,35 @@ class Catalogue(commands.Cog, name="catalogue"):
             str(interaction.user.id),
             False,
         )
+        await interaction.response.send("Catalogue successfully disabled.")
 
-        await ctx.send("Catalogue successfully disabled.")
-
-    @catalogue.command(
-        aliases=["recs", "recsview", "recommendations"],
-        description="View the contents of your catalogue, separated by approval status. Use one of recsview, recs or recommendations to view recommendations.",
+    @app_commands.command(name="recommendations", description="View a list of songs or albums recommended to you.")
+    @app_commands.describe(
+        member = "The member whose list of recommendations you would like to view.",
+        type = "Which type of recommendations you would like to view, defaults to both songs and albums."
     )
     @is_enabled()
-    async def view(self, ctx, member: Member = None):
+    async def view(self, interaction: discord.Interaction, member: discord.Member = None, type: Literal["track", "album"] = "type"):
 
-        approval_status = not ctx.invoked_with in [
-            "recs",
-            "recsview",
-            "recommendations",
-        ]
-
-        target = member if member is not None else ctx.author
+        target = member if member is not None else interaction.user
 
         music_info = await self.bot.db.execute(
             """
             SELECT type, music_id, artists, name, added_by 
             FROM catalogue
             WHERE user_id = $1
-            AND approved = $2
+            AND type = $2
             """,
             str(target.id),
-            approval_status,
+            type,
             is_query=True,
         )
 
+        unique_members = {record[4] for record in music_info}
+
         members = {
-            record[4]: await ctx.guild.fetch_member(int(record[4]))
-            for record in music_info
+            member_id: await interaction.guild.fetch_member(int(member_id))
+            for member_id in unique_members
         }
 
         urls = [
@@ -104,7 +101,7 @@ class Catalogue(commands.Cog, name="catalogue"):
         ]
 
         to_send = (
-            Embed(
+            discord.Embed(
                 title=f"{esc_md(target.display_name)}'s Catalogue",
                 description="",
                 colour=target.colour,
@@ -116,9 +113,9 @@ class Catalogue(commands.Cog, name="catalogue"):
             )
         )
         if catalogue_items != []:
-            await pagination.send_pages(ctx, to_send, catalogue_items)
+            await pagination.send_pages(interaction, to_send, catalogue_items)
         else:
-            await ctx.send("Your catalogue is empty!")
+            await interaction.response.send_message("Your catalogue is empty!", ephemeral=True)
 
     @catalogue.command(description="Check your catalogue for tracks/albums you have completed.")
     @commands.check(is_target_self)
