@@ -8,8 +8,6 @@ from dotenv import load_dotenv
 load_dotenv(verbose=True)
 
 LASTFM_KEY = os.getenv("LAST_KEY")
-
-
 class LastFM(commands.Cog, name="lastfm"):
     def __init__(self, bot) -> None:
         self.bot = bot

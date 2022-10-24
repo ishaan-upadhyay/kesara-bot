@@ -2,9 +2,10 @@ import asyncio
 import aiohttp
 from bot_helpers import pagination
 from urllib.parse import urlparse, urlunparse
-from discord.utils import escape_markdown as esc_md
 import discord
+from discord import app_commands, ui
 from discord.ext import commands
+from discord.utils import escape_markdown as esc_md
 from typing import Literal
 
 
@@ -117,10 +118,10 @@ class Catalogue(commands.Cog, name="catalogue"):
         else:
             await interaction.response.send_message("Your catalogue is empty!", ephemeral=True)
 
-    @catalogue.command(description="Check your catalogue for tracks/albums you have completed.")
+    @app_commands.command(description="Check your catalogue for tracks/albums you have completed.")
     @commands.check(is_target_self)
     @is_enabled()
-    async def check(self, ctx):
+    async def check(self, interaction: discord.Interaction):
         tasks = []
 
         music_info = await self.bot.db.execute(
@@ -130,13 +131,13 @@ class Catalogue(commands.Cog, name="catalogue"):
             WHERE user_id = $1
             AND approved = $2
             """,
-            str(ctx.author.id),
+            str(interaction.user.id),
             True,
             is_query=True,
         )
 
         members = {
-            record[4]: await ctx.guild.fetch_member(int(record[4]))
+            record[4]: await interaction.guild.fetch_member(int(record[4]))
             for record in music_info
         }
 
@@ -179,28 +180,28 @@ class Catalogue(commands.Cog, name="catalogue"):
                     WHERE user_id = $1
                     AND music_id = $2
                     """,
-                    str(ctx.author.id),
+                    str(interaction.user.id),
                     item[1],
                 )
                 for item in completed_items
             ]
 
-            to_send = Embed(
-                title=f"{esc_md(ctx.author.display_name)}'s Completed items",
+            to_send = discord.Embed(
+                title=f"{esc_md(interaction.author.display_name)}'s Completed items",
                 description="",
-                colour=ctx.author.colour,
-            ).set_thumbnail(url=ctx.author.avatar_url)
+                colour=interaction.user.colour,
+            ).set_thumbnail(url=interaction.user.avatar_url)
 
             await pagination.send_pages(ctx, to_send, embed_items)
 
         else:
-            await ctx.send(
-                "You have not completed any of the items in your catalogue since the last check."
+            await interaction.response.send_message(
+                "You have not completed any of the items in your catalogue since the last check.", ephemeral=True
             )
 
-    @catalogue.command(description="Recommend a song to another user.")
+    @app_commands.command(description="Recommend a song to another user.")
     @is_enabled()
-    async def recommend(self, ctx, link: str, member: Member):
+    async def recommend(self, ctx, link: str, member: discord.Member):
 
         music_type, music_id = urlparse(link).path[1:].split("/", 2)
 
@@ -223,8 +224,10 @@ class Catalogue(commands.Cog, name="catalogue"):
             count,
         )
 
+        
+
         to_send = (
-            Embed(
+            discord.Embed(
                 title=f"Recommended {music_type}!",
                 description=f'[{esc_md(", ".join(artists))} - {esc_md(name)}]({link}) | **{music_type}** - Recommended to: {esc_md(ctx.author.display_name)}',
                 colour=ctx.author.colour,
@@ -235,7 +238,7 @@ class Catalogue(commands.Cog, name="catalogue"):
 
         await ctx.send(embed=to_send)
 
-    @catalogue.command(description="Save a song to your own catalogue.")
+    @app_commands.command(description="Save a song to your own catalogue.")
     @commands.check(is_target_self)
     @is_enabled()
     async def save(self, ctx, link: str):
@@ -271,11 +274,11 @@ class Catalogue(commands.Cog, name="catalogue"):
 
         await ctx.send(embed=to_send)
 
-    @catalogue.command(description="Approve a song that has been recommended to you.")
+    @app_commands.command(description="Approve a song that has been recommended to you.")
     @commands.check(is_target_self)
-    async def approve(self, ctx, index: int):
+    async def approve(self, interaction: discord.Interaction, index: int):
 
-        entry_id = await self.get_music_by_index(ctx, index, False)
+        entry_id = await self.get_music_by_index(interaction, index, False)
 
         entry = await self.bot.db.execute(
             """
@@ -286,7 +289,7 @@ class Catalogue(commands.Cog, name="catalogue"):
             RETURNING type, music_id, artists, name, added_by
             """,
             True,
-            str(ctx.author.id),
+            str(interaction.user.id),
             entry_id,
             is_query=True,
             one_row=True,
@@ -297,22 +300,22 @@ class Catalogue(commands.Cog, name="catalogue"):
         )
         image = await self.get_music_art(entry[0], entry[1])
 
-        member = await ctx.guild.fetch_member(entry[4])
+        member = await interaction.guild.fetch_member(entry[4])
         added_by = member.display_name
 
         to_send = (
-            Embed(
+            discord.Embed(
                 title=f"Approved {entry[0]}!",
                 description=f'[{esc_md(", ".join(entry[2]))} - {esc_md(entry[3])}]({url}) | **{entry[0]}** - Recommended by: {esc_md(added_by)}',
-                colour=ctx.author.colour,
+                colour=interaction.user.colour,
             )
-            .set_author(name=ctx.author.display_name, url=ctx.author.avatar_url)
+            .set_author(name=interaction.user.display_name, url=interaction.user.avatar_url)
             .set_image(url=image)
         )
 
         await ctx.send(embed=to_send)
 
-    @catalogue.command(aliases=["deny"], description="Remove item from catalogue. Use deny to remove from recommendations.")
+    @app_commands.command(aliases=["deny"], description="Remove item from catalogue. Use deny to remove from recommendations.")
     @commands.check(is_target_self)
     async def remove(self, ctx, index: int):
 
@@ -385,7 +388,7 @@ class Catalogue(commands.Cog, name="catalogue"):
             album = await self.bot.spotify.album(id)
             return album.images[1].url
 
-    async def get_music_plays(self, ctx, music_type, music_id, artists, name):
+    async def get_music_plays(self, interaction, music_type, music_id, artists, name):
         lastfm = self.bot.get_cog("lastfm")
         await lastfm.get_username(ctx)
 
@@ -407,11 +410,12 @@ class Catalogue(commands.Cog, name="catalogue"):
                 tracks.extend(page.items)
 
             for track in tracks:
-                tasks.append(
-                    lastfm.get_playcount(
-                        artists[0], track.name, "track", ctx.lastfm_user
+                if track.duration_ms >= 30000: # Tracks that are under 30 seconds are not recorded as played by Spotify unless looped
+                    tasks.append(
+                        lastfm.get_playcount(
+                            artists[0], track.name, "track", interaction.lastfm_user
+                        )
                     )
-                )
 
             counts = await asyncio.gather(*tasks)
             counts = [int(count) for count in counts]
