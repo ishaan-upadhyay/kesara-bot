@@ -1,21 +1,25 @@
 import asyncio
 import re
+from typing import Literal
 from urllib.parse import urlparse, urlunparse
 import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import escape_markdown as esc_md
-from typing import Literal
-from bot_helpers import pagination
+from bot_helpers import pagination  # pylint: disable=import-error
+
 
 def is_target_self():
     """
     Command check for certain commands that a user should only be able
     to use on themselves - e.g. disabling/enabling catalogue functionality
     """
+
     def predicate(interaction: discord.Interaction):
         return not bool(interaction.message.raw_mentions)
+
     return app_commands.check(predicate)
+
 
 def is_enabled():
     """
@@ -23,23 +27,42 @@ def is_enabled():
     catalogue functionality enabled themselves - the target may be
     the user themselves
     """
+
     async def predicate(interaction: discord.Interaction):
         if interaction.message.raw_mentions != []:
             check_id = interaction.message.raw_mentions[0]
         else:
             check_id = interaction.user.id
         return interaction.client.cache.catalogue_users.get(check_id, None)
+
     return app_commands.check(predicate)
 
+
 class Catalogue(commands.GroupCog, name="catalogue"):
+    """
+    Commands cog to handle users saving music to automatically check against
+    Last.fm. Commands list is as follows:
+    /enable
+    /disable
+    /view
+    /save
+    /recommend
+    /approve
+    /remove
+    /approveall
+    /clear
+    /check
+    """
+
     def __init__(self, bot) -> None:
         self.bot = bot
         super().__init__()
 
-    @app_commands.command(name = "enable", description="Enable catalogue functionality for yourself.")
+    @app_commands.command(
+        name="enable", description="Enable catalogue functionality for yourself."
+    )
     async def enable(self, interaction: discord.Interaction):
-        """
-        """
+        """Enable catalogue functionality for the current user."""
         await self.bot.db.execute(
             """
             INSERT INTO users (user_id, catalogue_enabled)
@@ -50,12 +73,15 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             str(interaction.user.id),
             True,
         )
-        await interaction.response.send_message("""Catalogue successfully enabled.""", ephemeral=True)
+        await interaction.response.send_message(
+            """Catalogue successfully enabled.""", ephemeral=True
+        )
 
-    @app_commands.command(name = "disable", description="Disable catalogue functionality for yourself.")
+    @app_commands.command(
+        name="disable", description="Disable catalogue functionality for yourself."
+    )
     async def disable(self, interaction: discord.Interaction):
-        """
-        """
+        """Disable catalogue functionality for the current user."""
         await self.bot.db.execute(
             """
             INSERT INTO users (user_id, catalogue_enabled)
@@ -66,25 +92,38 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             str(interaction.user.id),
             False,
         )
-        await interaction.response.send_message("""Catalogue successfully disabled. Anyone can still view your catalogue and you may
-        recommend to other users, but you cannot save songs for yourself. Other users cannot recommend to you either.""", ephemeral=True)
+        await interaction.response.send_message(
+            """Catalogue successfully disabled. Anyone can still view your catalogue and you may
+               recommend to other users, but you cannot save songs for yourself. 
+               Other users cannot recommend to you either.""",
+            ephemeral=True,
+        )
 
-    @app_commands.command(name="viewcatalogue", description="View the catalogue or waitlist for a given user.")
-    @app_commands.describe(
-        member = "The member whose catalogue you would like to view. Leave empty to view your own.",
-        classification = "Which type of recommendations you would like to view, defaults to both songs and albums if left empty.",
-        approved = "True to view all approved submissions, false otherwise. Defaults to true."
+    @app_commands.command(
+        name="viewcatalogue",
+        description="View the catalogue or waitlist for a given user.",
     )
-    async def view(self, interaction: discord.Interaction, member: discord.Member = None, classification: Literal["track", "album"] = "type", approved: bool = True):
+    @app_commands.describe(
+        member="The member whose catalogue you would like to view. Leave empty to view your own.",
+        classification="Which type of recommendations you would like to view, defaults to both songs and albums if left empty.",
+        approved="True to view all approved submissions, false otherwise. Defaults to true.",
+    )
+    async def view(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member = None,
+        classification: Literal["track", "album"] = "type",
+        approved: bool = True,
+    ):
         """
         Command to allow users to view items saved to catalogue, categorized
-        by approval status. 
+        by approval status.
         """
         target = member if member is not None else interaction.user
 
         music_info = await self.bot.db.execute(
             """
-            SELECT type, music_id, artists, name, added_by 
+            SELECT type, music_id, artists, name, added_by
             FROM catalogue
             WHERE user_id = $1
             AND type = $2
@@ -95,17 +134,23 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             approved,
             is_query=True,
         )
-        to_send, catalogue_items = self._build_embeds(interaction, music_info)
-        if catalogue_items != []:
-            await pagination.send_pages(interaction, to_send, catalogue_items)
-        else:
-            await interaction.response.send_message("Your catalogue is empty!", ephemeral=True)
 
-    @app_commands.command(description="Check your catalogue for tracks/albums you have completed.")
+        if music_info != ():
+            await self._send_as_embeds(interaction, music_info)
+        else:
+            await interaction.response.send_message(
+                "Your catalogue is empty!", ephemeral=True
+            )
+
+    @app_commands.command(
+        description="Check your catalogue for tracks/albums you have completed."
+    )
     @is_target_self()
     @is_enabled()
     async def check(self, interaction: discord.Interaction):
         """
+        Command to check for completed items, either from recommendations
+        on self-saved.
         """
         tasks = []
 
@@ -134,8 +179,6 @@ class Catalogue(commands.GroupCog, name="catalogue"):
 
         if completed_items != ():
 
-            to_send, embed_items = self._build_embeds(interaction, completed_items, removing = True)
-
             for item in completed_items:
                 await self.bot.db.execute(
                     """
@@ -146,17 +189,28 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                     str(interaction.user.id),
                     item[1],
                 )
-            await pagination.send_pages(interaction, to_send, embed_items)
+            await self._send_as_embeds(interaction, completed_items, removing=True)
 
         else:
             await interaction.response.send_message(
-            "You have not completed any of the items in your catalogue since the last check.", ephemeral=True
+                "You have not completed any of the items in your catalogue since the last check.",
+                ephemeral=True,
             )
 
-    @app_commands.command(description="Recommend a song to another user. Please note that this only works with Spotify links.")
+    @app_commands.command(
+        description="Recommend a song to another user. Please note that this only works with Spotify links."
+    )
+    @app_commands.describe(
+        link="Spotify link to music/album to recommend.",
+        member="The user you would like to recommend the song to.",
+    )
     @is_enabled()
-    async def recommend(self, interaction: discord.Interaction, link: str, member: discord.Member):
-        """"""
+    async def recommend(
+        self, interaction: discord.Interaction, link: str, member: discord.Member
+    ):
+        """
+        Command for recommending music to other users.
+        """
         if not self._is_spotify_link(link):
             await interaction.response.send("That is not a Spotify link!")
             return
@@ -188,17 +242,21 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 description=f'[{esc_md(", ".join(artists))} - {esc_md(name)}]({link}) | **{music_type}** - Recommended to: {esc_md(interaction.user.display_name)}',
                 colour=interaction.user.colour,
             )
-            .set_author(name=interaction.user.display_name, url=interaction.user.avatar_url)
+            .set_author(
+                name=interaction.user.display_name, url=interaction.user.avatar_url
+            )
             .set_image(url=image)
         )
 
-        await interaction.send(embed=to_send)
+        await interaction.response.send(embed=to_send)
 
     @app_commands.command(description="Save a song to your own catalogue.")
     @is_target_self()
     @is_enabled()
     async def save(self, interaction: discord.Interaction, link: str):
-        """"""
+        """
+        Command for a user to save music for themselves. Auto-approves submissions.
+        """
         if not self._is_spotify_link(link):
             await interaction.response.send("That is not a Spotify link!")
             return
@@ -228,16 +286,26 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 description=f'[{esc_md(", ".join(artists))} - {esc_md(name)}]({link}) | **{music_type}**',
                 colour=interaction.user.colour,
             )
-            .set_author(name=interaction.user.display_name, url=interaction.user.avatar_url)
+            .set_author(
+                name=interaction.user.display_name, url=interaction.user.avatar_url
+            )
             .set_image(url=image)
         )
 
-        await interaction.send(embed=to_send)
+        await interaction.response.send(embed=to_send)
 
-    @app_commands.command(description="Approve a song that has been recommended to you.")
+    @app_commands.command(
+        description="Approve a song that has been recommended to you."
+    )
+    @app_commands.describe(
+        index="Which item would you like to approve, index relative to the view command."
+    )
     @is_target_self()
     async def approve(self, interaction: discord.Interaction, index: int):
-        """"""
+        """
+        Allow a user to approve a recommendation to be saved to their main
+        catalogue. Only manual approval is allowed due to usage considerations.
+        """
         entry_id = await self._get_music_by_index(interaction, index, False)
 
         entry = await self.bot.db.execute(
@@ -269,23 +337,27 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 description=f'[{esc_md(", ".join(entry[2]))} - {esc_md(entry[3])}]({url}) | **{entry[0]}** - Recommended by: {esc_md(added_by)}',
                 colour=interaction.user.colour,
             )
-            .set_author(name=interaction.user.display_name, url=interaction.user.avatar_url)
+            .set_author(
+                name=interaction.user.display_name, url=interaction.user.avatar_url
+            )
             .set_image(url=image)
         )
 
-        await interaction.send(embed=to_send)
+        await interaction.response.send_message(embed=to_send)
 
     @app_commands.command(description="Remove an item you have saved to the catalogue.")
     @app_commands.describe(
-        index = "The index of this item as seen in the viewcatalogue command.", 
-        approval = "True if the item being removed was already approved, false to deny an unapproved item."
+        index="The index of this item as seen in the view command.",
+        approval="True if the item being removed was already approved, false to deny an unapproved item.",
     )
     @is_target_self()
-    async def remove(self, interaction: discord.Interaction, index: int, approval: bool):
-        """"""
-        entry_id = await self._get_music_by_index(
-            interaction, index, approval
-        )
+    async def remove(
+        self, interaction: discord.Interaction, index: int, approval: bool
+    ):
+        """
+        Commanmd to remove a song from the catalogue.
+        """
+        entry_id = await self._get_music_by_index(interaction, index, approval)
 
         removed = await self.bot.db.execute(
             """
@@ -324,20 +396,41 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 description=f'[{esc_md(", ".join(removed[2]))} - {esc_md(removed[3])})]({url}) | **{removed[0]}** - Recommended by: {esc_md(added_by)}',
                 colour=interaction.user.colour,
             )
-            .set_author(name=interaction.user.display_name, url=interaction.user.avatar_url)
+            .set_author(
+                name=interaction.user.display_name, url=interaction.user.avatar_url
+            )
             .set_image(url=image)
         )
 
-        await interaction.send(embed=to_send)
+        await interaction.response.send(embed=to_send)
+
+    @app_commands.command(description="Approve all recommendations.")
+    @is_target_self()
+    async def approveall(self, interaction: discord.Interaction):
+        """Function to approve all unapproved recommendations."""
+        approved = await self.bot.db.execute(
+            """
+            UPDATE catalogue
+            SET approved = $1
+            WHERE user_id = $2
+            AND approved IS DISTINCT FROM $1
+            RETURNING type, music_id, artists, name, added_by
+            """,
+            True,
+            str(interaction.user.id),
+            is_query=True,
+        )
+
+        await self._send_as_embeds(interaction, approved)
 
     @app_commands.command(description="Clear the catalogue")
     @app_commands.describe(
-        deleteall = "True to clear entire catalogue, false to clear only unapproved submissions"
+        deleteall="True to clear entire catalogue, false to clear only unapproved submissions."
     )
     @is_target_self()
     async def clear(self, interaction: discord.Interaction, deleteall: bool):
         """Function to clear the entire catalogue."""
-        to_remove =  "approved" if deleteall else True
+        to_remove = "approved" if deleteall else True
         removed = await self.bot.db.execute(
             """
             DELETE FROM catalogue
@@ -347,18 +440,22 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             """,
             str(interaction.user.id),
             to_remove,
-            is_query=True
+            is_query=True,
         )
 
         if removed == ():
-            await interaction.response.send_message("Whatever you were trying to clear has already been cleared.", ephemeral=True)
+            await interaction.response.send_message(
+                "Whatever you were trying to clear has already been cleared.",
+                ephemeral=True,
+            )
             return
-        
-        to_send, catalogue_items = await self._build_embeds(interaction, removed, True)
-        await pagination.send_pages(interaction, to_send, catalogue_items)
-        
-    async def _get_music_info(self, music_type: Literal['track', 'album'], identifier: str):
-        """Use the Spotify API to retreive music information."""
+
+        await self._send_as_embeds(interaction, removed, removing=True)
+
+    async def _get_music_info(
+        self, music_type: Literal["track", "album"], identifier: str
+    ):
+        """Use the Spotify API to retreive track names and artists."""
         if music_type == "track":
             track = await self.bot.spotify.track(id)
             artists = [artist.name for artist in track.artists]
@@ -369,16 +466,25 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             artists = [artist.name for artist in album.artists]
             return album.name, artists, album.total_tracks
 
-    async def _get_music_art(self, music_type: Literal['album', 'track'], identifier: str):
+    async def _get_music_art(
+        self, music_type: Literal["album", "track"], identifier: str
+    ):
         """Use the Spotify API to retrieve the cover art for a given single or album."""
         if music_type == "track":
             track = await self.bot.spotify.track(identifier)
             return track.album.images[1].url
-        elif music_type == "album":
+        if music_type == "album":
             album = await self.bot.spotify.album(identifier)
             return album.images[1].url
 
-    async def _get_music_plays(self, interaction: discord.Interaction, music_type: Literal['album', 'track'], music_id, artists, name):
+    async def _get_music_plays(
+        self,
+        interaction: discord.Interaction,
+        music_type: Literal["album", "track"],
+        music_id,
+        artists,
+        name,
+    ):
         """Use the Last.fm API to retrieve play data based on Spotify information."""
         lastfm = self.bot.get_cog("lastfm")
         await lastfm.get_username(interaction)
@@ -388,7 +494,8 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 artists[0], name, music_type, interaction.lastfm_user
             )
             return int(count)
-        elif music_type == "album":
+
+        if music_type == "album":
 
             tracks = []
             tasks = []
@@ -400,7 +507,9 @@ class Catalogue(commands.GroupCog, name="catalogue"):
                 tracks.extend(page.items)
 
             for track in tracks:
-                if track.duration_ms >= 30000: # Tracks that are under 30 seconds are not recorded as played by Spotify unless looped
+                if (
+                    track.duration_ms >= 30000
+                ):  # Tracks that are under 30 seconds are not recorded as played by Spotify unless looped
                     tasks.append(
                         lastfm.get_playcount(
                             artists[0], track.name, "track", interaction.lastfm_user
@@ -411,7 +520,9 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             counts = [int(count) for count in counts]
             return sum(counts) if 0 not in counts else 0
 
-    async def _get_music_by_index(self, interaction: discord.Interaction, index: int, approved: bool):
+    async def _get_music_by_index(
+        self, interaction: discord.Interaction, index: int, approved: bool
+    ):
         """Retrieve item at a specific offset from the PostgreSQL database"""
         return await self.bot.db.execute(
             """
@@ -430,19 +541,29 @@ class Catalogue(commands.GroupCog, name="catalogue"):
 
     def _is_spotify_link(self, link: str) -> bool:
         """
-        Additional link format checking - bot only supports Spotify links 
+        Additional link format checking - bot only supports Spotify links
         currently for data consistency reasons
         """
         parsed = urlparse(link)
         musictype, identifier = parsed.path.split("/", 2)
-        return parsed.netloc == "open.spotify.com" and \
-               musictype in ("track", "album") and \
-               len(identifier) == 22 and re.match("^[a-zA-Z0-9]*$", identifier)
+        return (
+            parsed.netloc == "open.spotify.com"
+            and musictype in ("track", "album")
+            and len(identifier) == 22
+            and re.match("^[a-zA-Z0-9]*$", identifier)
+        )
 
-    async def _build_embeds(self, interaction: discord.Interaction, records, removing: bool = False, completing: bool = False) -> bool:
+    async def _send_as_embeds(
+        self,
+        interaction: discord.Interaction,
+        records,
+        removing: bool = False,
+        completing: bool = False,
+    ) -> bool:
         """
         Build embeds based on music items to be marked as removed, completed or for simple viewing.
-        Embed titles vary based on command invocation - notify users using 'preceding'
+        Embed titles vary based on command invocation - notify users using 'preceding'.
+        Send all embeds using the pagination module.
         """
         unique_members = {record[4] for record in records}
 
@@ -470,7 +591,9 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             for i, (record, url) in enumerate(zip(records, urls), 1)
         ]
 
-        preceding = "Removed from " if removing else "Completed in " if completing else ""
+        preceding = (
+            "Removed from " if removing else "Completed in " if completing else ""
+        )
         to_send = (
             discord.Embed(
                 title=f"{preceding}{esc_md(interaction.user.display_name)}'s Catalogue",
@@ -484,7 +607,8 @@ class Catalogue(commands.GroupCog, name="catalogue"):
             )
         )
 
-        return to_send, catalogue_items
-    
+        await pagination.send_pages(interaction, to_send, catalogue_items)
+
+
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Catalogue(bot))
